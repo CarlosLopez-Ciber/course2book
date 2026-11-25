@@ -1,0 +1,47 @@
+# Entornos virtuales y cachés de Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Empaquetado y compilación
+build/
+dist/
+*.egg-info/
+.eggs/
+*.so
+*.pyd
+
+# Secretos, claves y variables de entorno
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*credentials*.json
+*secret*.json
+
+# Sistema operativo e IDEs
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+*.log
+
+# Artefactos temporales de course2book (por si se ejecuta dentro del repo)
+*.draft.md
+.*.progress.json
+*.progress.json
+*.progress.json.tmp
