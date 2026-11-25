@@ -26,18 +26,19 @@ Obsidian needs no extra plugin. Open the output folder as a vault because every 
 
 ## Quick setup
 
-Clone the repository, enter the project folder, and check that Python, CUDA, and FFmpeg are ready:
+Install the latest release globally with `uv` (no manual clone required):
+
+```bash
+uv tool install git+https://github.com/CarlosLopez-Ciber/course2book@v0.1.0
+course2book check-env
+```
+
+Or clone the repository to run it from source:
 
 ```bash
 git clone https://github.com/CarlosLopez-Ciber/course2book.git
 cd course2book
 uv run course2book check-env
-```
-
-To run `course2book` from any directory without typing `uv run`, install it as an editable global tool:
-
-```bash
-uv tool install -e .
 ```
 
 ## Three ways to use it

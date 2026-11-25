@@ -26,18 +26,19 @@ Obsidian no necesita ningún plugin adicional. Solo abres la carpeta de salida p
 
 ## Instalación rápida y comprobación del entorno
 
-Clona el repositorio, entra en la carpeta del proyecto y comprueba que Python, CUDA y FFmpeg estén listos:
+Instala la última release globalmente con `uv` (sin clonar el repositorio):
+
+```powershell
+uv tool install git+https://github.com/CarlosLopez-Ciber/course2book@v0.1.0
+course2book check-env
+```
+
+O clona el repositorio para ejecutarlo desde el código fuente:
 
 ```powershell
 git clone https://github.com/CarlosLopez-Ciber/course2book.git
 cd course2book
 uv run course2book check-env
-```
-
-Si prefieres ejecutar `course2book` desde cualquier carpeta sin escribir `uv run`, instálalo como herramienta global editable:
-
-```powershell
-uv tool install -e .
 ```
 
 ## Tres formas de usarlo
