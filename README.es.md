@@ -5,7 +5,7 @@
 
 [English](README.md) | **Español**
 
-`course2book` convierte cursos técnicos de TI en video (programación, ciberseguridad, ingeniería inversa o infraestructura) en capítulos completos en español o inglés (`--book-lang es|en`) para Obsidian. Funciona en local con Python 3.11 o 3.12 (`uv`), `faster-whisper` (CUDA o CPU) y `ffmpeg`. Acepta cualquier formato que soporte FFmpeg y genera archivos en Markdown estándar (sin wikilinks) con capturas PNG limpias.
+`course2book` convierte cursos técnicos en video en capítulos completos en español o inglés (`--book-lang es|en`) para Obsidian. Funciona en local con Python 3.11 o 3.12 (`uv`), `faster-whisper` (CUDA o CPU) y `ffmpeg`. Acepta cualquier formato que soporte FFmpeg y genera archivos en Markdown estándar (sin wikilinks) con capturas PNG limpias.
 
 ## Cómo funciona
 

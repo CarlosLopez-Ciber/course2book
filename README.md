@@ -5,7 +5,7 @@
 
 **English** | [Español](README.es.md)
 
-`course2book` turns technical IT video courses (programming, cybersecurity, reverse engineering, or infrastructure) into detailed Markdown book chapters for Obsidian. It runs locally with Python 3.11 or 3.12 (`uv`), `faster-whisper` (CUDA or CPU), and `ffmpeg`. It accepts any video format that FFmpeg supports, generates chapters in English or Spanish (`--book-lang en|es`), and outputs standard Markdown (no wikilinks) with clean PNG screenshots.
+`course2book` turns technical video courses into detailed Markdown book chapters for Obsidian. It runs locally with Python 3.11 or 3.12 (`uv`), `faster-whisper` (CUDA or CPU), and `ffmpeg`. It accepts any video format that FFmpeg supports, generates chapters in English or Spanish (`--book-lang en|es`), and outputs standard Markdown (no wikilinks) with clean PNG screenshots.
 
 ## How it works
 
