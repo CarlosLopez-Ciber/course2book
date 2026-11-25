@@ -488,3 +488,53 @@ def test_synthesize_lesson_resumes_from_partial_checkpoint(tmp_path: Path) -> No
     assert "Bloque recuperado del checkpoint." in text
     assert "## Tcache Poisoning (⏱️ 00:10:00)" in text
     assert not artifacts.checkpoint_path.exists()
+
+
+def test_synthesize_lesson_english_target_language(tmp_path: Path) -> None:
+    from course2book.config import SrtEntry
+    from course2book.obsidian import build_lesson_artifacts
+    from course2book.synthesizer import BaseSynthesizer, synthesize_lesson
+
+    captured_prompts: list[tuple[str, str]] = []
+
+    class _RecordingSynth(BaseSynthesizer):
+        def generate(self, system_prompt: str, user_prompt: str, images: list[Path] | None = None) -> str:
+            captured_prompts.append((system_prompt, user_prompt))
+            if "OPENING_START" in user_prompt:
+                return (
+                    "<!-- OPENING_START -->\n"
+                    "## Learning Objectives\n- Run `gdb`.\n"
+                    "<!-- OPENING_END -->\n"
+                    "<!-- CLOSING_START -->\n"
+                    "## Hands-On Practice\n- [ ] Run `gdb ./app`\n"
+                    "<!-- CLOSING_END -->"
+                )
+            return "## Debugging Basics (⏱️ 00:00:10)\n\nUse `gdb ./app`."
+
+    output_root = tmp_path / "book_en"
+    artifacts = build_lesson_artifacts(Path("01_gdb.mp4"), Path("."), output_root)
+    entries = [SrtEntry(index=1, start=10.0, end=25.0, text="Run gdb on the binary.")]
+    cfg = SynthesisConfig(
+        engine="ollama",
+        model="gemma4:12b",
+        vision=False,
+        auto_cleanup=False,
+        target_language="en",
+    )
+
+    final_path = synthesize_lesson(
+        artifacts=artifacts,
+        entries=entries,
+        frames=[],
+        config=cfg,
+        synthesizer=_RecordingSynth(cfg),
+    )
+
+    text = final_path.read_text(encoding="utf-8")
+    assert "language: en" in text
+    assert "> [!info] Lesson metadata" in text
+    assert "**Source video:**" in text
+    assert "  - course" in text
+    assert len(captured_prompts) == 2
+    assert "clear professional technical English" in captured_prompts[0][0]
+    assert "chronological block 1 of 1" in captured_prompts[0][1]

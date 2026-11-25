@@ -208,11 +208,13 @@ def generate_course_index(
     course_title: str,
     lessons: list[LessonArtifacts],
     resources: dict[Path, list[Path]] | None = None,
+    target_language: str = "es",
 ) -> Path:
-    """Genera `00_Indice.md` agrupado por módulo con enlaces Markdown estándar y recursos detectados."""
+    """Genera el índice del curso (`00_Indice.md` o `00_Index.md`) agrupado por módulo."""
     output_root = Path(output_root)
     output_root.mkdir(parents=True, exist_ok=True)
-    index_path = output_root / _INDEX_FILENAME
+    is_en = target_language.strip().lower().startswith("en")
+    index_path = output_root / ("00_Index.md" if is_en else _INDEX_FILENAME)
 
     lessons_by_module: dict[Path, list[LessonArtifacts]] = {}
     for lesson in lessons:
@@ -261,7 +263,8 @@ def generate_course_index(
                 lines.append(f"- [{lesson_title}]({rel_link})")
             else:
                 rel_link = encode_md_path(_relative_posix(lesson.draft_md_path, output_root))
-                lines.append(f"- [{lesson_title}]({rel_link}) (borrador)")
+                draft_label = "draft" if is_en else "borrador"
+                lines.append(f"- [{lesson_title}]({rel_link}) ({draft_label})")
 
         if module_lessons:
             lines.append("")
@@ -271,7 +274,10 @@ def generate_course_index(
             key=lambda p: _natural_sort_key(p.name),
         )
         if module_resources:
-            lines.append("### Recursos y laboratorios detectados")
+            res_heading = (
+                "### Supplementary resources and labs" if is_en else "### Recursos y laboratorios detectados"
+            )
+            lines.append(res_heading)
             lines.append("")
             for res_path in module_resources:
                 lines.append(f"- `{res_path.name}`")

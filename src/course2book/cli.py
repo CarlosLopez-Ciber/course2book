@@ -14,6 +14,7 @@ from rich.table import Table
 
 from course2book.config import (
     DOMAIN_PROMPTS,
+    BookLanguage,
     DomainProfile,
     EngineType,
     FrameConfig,
@@ -74,6 +75,13 @@ def _validate_engine(engine: str, allow_agent: bool = True) -> EngineType:
             f"Motor inválido '{engine}'. Opciones válidas: {', '.join(sorted(allowed))}"
         )
     return cast(EngineType, normalized)
+
+
+def _validate_book_lang(book_lang: str) -> BookLanguage:
+    normalized = book_lang.lower().strip()
+    if normalized not in {"es", "en"}:
+        raise typer.BadParameter(f"Idioma de libro inválido '{book_lang}'. Opciones válidas: es, en")
+    return cast(BookLanguage, normalized)
 
 
 def _normalize_language(language: str | None) -> str | None:
@@ -335,6 +343,7 @@ def _run_prepare_phases(
     skip_transcribe: bool,
     probe_all: bool,
     skip_existing_final: bool = False,
+    target_language: BookLanguage = "es",
 ) -> list[tuple[LessonArtifacts, list, list, MediaInfo | None]]:
     """Ejecuta Fase 1 (GPU Whisper + unload) y Fase 2 (CPU Frames + Drafts + 00_Indice.md)."""
     videos = discover_videos(input_path, probe_all=probe_all)
@@ -428,7 +437,13 @@ def _run_prepare_phases(
             progress.advance(task)
 
     resources = discover_resources(input_root) if input_root.is_dir() else None
-    index_path = generate_course_index(output_root, resolved_title, all_artifacts, resources=resources)
+    index_path = generate_course_index(
+        output_root,
+        resolved_title,
+        all_artifacts,
+        resources=resources,
+        target_language=target_language,
+    )
     console.print(f"[green]Índice generado:[/green] {index_path}")
     return prepared
 
@@ -451,15 +466,19 @@ def prepare_cmd(
     max_frames: Annotated[int, typer.Option("--max-frames")] = 120,
     image_format: Annotated[str, typer.Option("--format")] = "png",
     ignore_pip: Annotated[bool, typer.Option("--ignore-pip/--no-ignore-pip")] = True,
-    title: Annotated[str | None, typer.Option("--title", help="Título del curso para 00_Indice.md.")] = None,
+    title: Annotated[str | None, typer.Option("--title", help="Título del curso para el índice.")] = None,
+    book_lang: Annotated[
+        str, typer.Option("--book-lang", help="Idioma del libro y del índice: es o en.")
+    ] = "es",
     skip_transcribe: Annotated[
         bool, typer.Option("--skip-transcribe", help="Omite Whisper y usa .srt ya existentes.")
     ] = False,
     resume: Annotated[bool, typer.Option("--resume/--no-resume")] = False,
     probe_all: Annotated[bool, typer.Option("--probe-all/--no-probe-all")] = False,
 ) -> None:
-    """Ejecuta Fase 1 (Whisper .srt) + Fase 2 (Capturas PNG + .draft.md + 00_Indice.md)."""
+    """Ejecuta Fase 1 (Whisper .srt) + Fase 2 (Capturas PNG + .draft.md + índice)."""
     domain_profile = _validate_domain(domain)
+    target_lang = _validate_book_lang(book_lang)
     fmt = image_format.lower().strip()
     if fmt not in {"png", "webp"}:
         raise typer.BadParameter("El formato debe ser 'png' o 'webp'.")
@@ -491,6 +510,7 @@ def prepare_cmd(
         course_title=title,
         skip_transcribe=skip_transcribe,
         probe_all=probe_all,
+        target_language=target_lang,
     )
     _print_agent_instructions(output)
 
@@ -521,10 +541,14 @@ def synthesize_cmd(
     resume: Annotated[
         bool, typer.Option("--resume/--no-resume", help="Reanuda desde checkpoints o salta capítulos ya completados.")
     ] = False,
-    title: Annotated[str | None, typer.Option("--title", help="Título del curso para actualizar 00_Indice.md.")] = None,
+    title: Annotated[str | None, typer.Option("--title", help="Título del curso para actualizar el índice.")] = None,
+    book_lang: Annotated[
+        str, typer.Option("--book-lang", help="Idioma de salida del libro: es o en.")
+    ] = "es",
 ) -> None:
-    """Sintetiza borradores `.draft.md` en capítulos exhaustivos en español."""
+    """Sintetiza borradores `.draft.md` en capítulos exhaustivos (español o inglés)."""
     engine_type = _validate_engine(engine, allow_agent=False)
+    target_lang = _validate_book_lang(book_lang)
     draft_files = [target] if target.is_file() else sorted(target.rglob("*.draft.md"))
     if not draft_files:
         console.print(f"[yellow]No se encontraron archivos `.draft.md` en:[/yellow] {target}")
@@ -542,6 +566,7 @@ def synthesize_cmd(
         max_images_per_block=max_images_per_block,
         auto_cleanup=cleanup,
         resume=resume,
+        target_language=target_lang,
     )
 
     processed_artifacts: list[LessonArtifacts] = []
@@ -581,7 +606,9 @@ def synthesize_cmd(
 
     if target.is_dir():
         course_title = title or target.name
-        index_path = generate_course_index(target, course_title, processed_artifacts)
+        index_path = generate_course_index(
+            target, course_title, processed_artifacts, target_language=target_lang
+        )
         console.print(f"[green]Índice actualizado:[/green] {index_path}")
 
 
@@ -617,10 +644,14 @@ def build_cmd(
     cleanup: Annotated[bool, typer.Option("--cleanup/--no-cleanup")] = True,
     resume: Annotated[bool, typer.Option("--resume/--no-resume")] = False,
     title: Annotated[str | None, typer.Option("--title")] = None,
+    book_lang: Annotated[
+        str, typer.Option("--book-lang", help="Idioma de salida del libro: es o en.")
+    ] = "es",
 ) -> None:
     """Pipeline completo por fases: GPU Whisper -> CPU Frames/Drafts -> Síntesis + Limpieza."""
     domain_profile = _validate_domain(domain)
     engine_type = _validate_engine(engine, allow_agent=True)
+    target_lang = _validate_book_lang(book_lang)
     fmt = image_format.lower().strip()
     if fmt not in {"png", "webp"}:
         raise typer.BadParameter("El formato debe ser 'png' o 'webp'.")
@@ -653,6 +684,7 @@ def build_cmd(
         skip_transcribe=skip_transcribe,
         probe_all=probe_all,
         skip_existing_final=resume,
+        target_language=target_lang,
     )
 
     if engine_type == "agent":
@@ -672,6 +704,7 @@ def build_cmd(
         max_images_per_block=max_images_per_block,
         auto_cleanup=cleanup,
         resume=resume,
+        target_language=target_lang,
     )
 
     synthesizer = create_synthesizer(synth_cfg)
@@ -711,7 +744,9 @@ def build_cmd(
     input_root = path if path.is_dir() else path.parent
     resolved_title = title or (path.name if path.is_dir() else path.stem)
     resources = discover_resources(input_root) if input_root.is_dir() else None
-    index_path = generate_course_index(output, resolved_title, all_artifacts, resources=resources)
+    index_path = generate_course_index(
+        output, resolved_title, all_artifacts, resources=resources, target_language=target_lang
+    )
     console.print(f"[bold green]Libro técnico completado.[/bold green] Índice: {index_path}")
 
 

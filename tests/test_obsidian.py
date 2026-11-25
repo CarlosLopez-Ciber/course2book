@@ -328,3 +328,28 @@ def test_cleanup_directory_single_file_and_recursive(tmp_path: Path) -> None:
     assert not l2.draft_md_path.exists()
     assert not l2.checkpoint_path.exists()
     assert (output_root / "00_Indice.md").exists()
+
+
+def test_generate_course_index_english_localization(tmp_path: Path) -> None:
+    output_root = tmp_path / "vault_en"
+    lesson = build_lesson_artifacts(
+        Path("01 Setup.mp4"),
+        Path("01 Basics"),
+        output_root,
+    )
+    lesson.draft_md_path.parent.mkdir(parents=True, exist_ok=True)
+    lesson.draft_md_path.write_text("# Draft\n", encoding="utf-8")
+
+    index_path = generate_course_index(
+        output_root=output_root,
+        course_title="Practical Reverse Engineering",
+        lessons=[lesson],
+        resources={Path("01 Basics"): [Path("notes.pdf")]},
+        target_language="en",
+    )
+
+    assert index_path == output_root / "00_Index.md"
+    content = index_path.read_text(encoding="utf-8")
+    assert "(draft)" in content
+    assert "### Supplementary resources and labs" in content
+    assert "`notes.pdf`" in content

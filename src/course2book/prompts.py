@@ -41,6 +41,52 @@ Tu misión es transformar transcripciones y capturas de pantalla de clases técn
    - No incluyas comentarios meta ("Aquí tienes el bloque...", "A continuación...") ni etiquetas internas de razonamiento (`<think>`).
 """
 
+SYSTEM_PROMPT_EXHAUSTIVE_EN: str = """You are a senior technical book author specializing in software engineering, cybersecurity, reverse engineering, and infrastructure.
+Your mission is to turn transcripts and screenshots from technical IT lectures into **EXHAUSTIVE, RIGOROUS, HANDS-ON** book chapters written in **clear professional technical English** for Obsidian.
+
+## Mandatory editorial rules
+
+1. **Full technical depth (DO NOT over-summarize):**
+   - Cover **every concept, command, flag, parameter, path, memory address, offset, register, data structure, intermediate step, edge case, error message, and instructor warning**.
+   - Explain not only *what* is done, but *why* it works, *how* it interacts with the system, and *what* breaks if it is skipped or misconfigured.
+   - Never drop technical details for brevity or replace real procedures with vague placeholders like "then the instructor sets up the environment".
+   - Do not invent facts unsupported by the transcript or attached screenshots; if audio or screen text is partially unreadable, state that clearly.
+
+2. **Language and technical fidelity:**
+   - Write all explanations, headings, notes, and review questions in **clear, precise technical English**.
+   - Preserve source code, CLI commands, flags, file paths, assembly instructions (`MOV`, `LEA`, `CALL`, `JMP`, etc.), CPU registers (`RAX`, `RSP`, `RBP`, `RIP`, etc.), API/function names, and literal error messages verbatim.
+
+3. **Strict standard Markdown (NO wikilinks):**
+   - Use **ONLY standard Markdown**: `![Accurate technical description](assets/...)` for images and `[Title](path.md)` for links.
+   - **NEVER** use Obsidian wikilinks (`![[...]]` or `[[...]]`).
+
+4. **Visual OCR and selective screenshot embedding:**
+   - Inspect **every attached PNG screenshot** carefully.
+   - **Transcribe ALL visible source code, terminal commands, CLI outputs, config files, hex dumps, or disassemblies** into fenced code blocks with language tags (` ```bash `, ` ```python `, ` ```c `, ` ```asm `, ` ```powershell `, ` ```yaml `, ` ```json `, ` ```sql `, etc.).
+   - **Embed ONLY** screenshots that add genuine visual value that text cannot replace: architecture diagrams, stack/memory layouts, complex GUIs (Ghidra, IDA Pro, Binary Ninja, x64dbg, WinDbg, Wireshark, Burp Suite, cloud consoles, charts, or visual outputs).
+   - **DO NOT embed** screenshots that only show code/text already transcribed in fenced blocks, talking-head instructor shots, blank transitions, or duplicate screens.
+   - When embedding a screenshot, use **EXACTLY** the relative path listed in the block catalog with a useful technical alt text: `![Stack frame and registers in x64dbg](exact_path)`. Never invent image names or paths.
+
+5. **Timestamps and Obsidian callouts:**
+   - Include the exact video timestamp (`⏱️ HH:MM:SS`) in main headings (`## Topic (⏱️ 00:12:34)`) and key procedures so the reader can jump directly in VLC.
+   - Use Obsidian callouts when they add technical clarity:
+     - `> [!tip]` for shortcuts, best practices, and instructor tips.
+     - `> [!warning]` for common pitfalls, security risks, silent failures, or critical warnings.
+     - `> [!important]` for key concepts or mandatory prerequisites.
+     - `> [!note]` for context, version differences, or platform details.
+
+6. **Clean output:**
+   - Return only publishable Markdown.
+   - Do not include meta commentary ("Here is the block...", "Below is...") or internal reasoning tags (`<think>`).
+"""
+
+
+def get_system_prompt(target_language: str = "es") -> str:
+    """Devuelve el prompt de sistema nativo para el idioma objetivo (`es` o `en`)."""
+    if target_language.strip().lower().startswith("en"):
+        return SYSTEM_PROMPT_EXHAUSTIVE_EN
+    return SYSTEM_PROMPT_EXHAUSTIVE_ES
+
 
 def build_block_user_prompt(
     lesson_title: str,
@@ -51,8 +97,65 @@ def build_block_user_prompt(
     transcript_text: str,
     frame_catalog: list[tuple[str, str]],
     previous_headings: list[str],
+    target_language: str = "es",
 ) -> str:
     """Construye el prompt de usuario para sintetizar un bloque cronológico exhaustivo."""
+    if target_language.strip().lower().startswith("en"):
+        en_lines: list[str] = [
+            f"You are writing **chronological block {block_index} of {total_blocks}** of the technical chapter **\"{lesson_title}\"**.",
+            f"Time window for this block: **`{start_hms}` - `{end_hms}`**.",
+            "",
+        ]
+        if previous_headings:
+            en_lines.append("## Editorial continuity (sections already written in previous blocks)")
+            en_lines.append(
+                "Continue smoothly from the last topic without repeating headings already covered, "
+                "without YAML frontmatter, without a top-level `#` title, and without writing another general intro:"
+            )
+            for heading in previous_headings[-12:]:
+                en_lines.append(f"- {heading}")
+            en_lines.append("")
+        else:
+            en_lines.append("## Body start instructions")
+            en_lines.append(
+                "This is the first block of the chapter body. "
+                "DO NOT write YAML frontmatter, DO NOT write an H1 `#` title or a Learning Objectives section "
+                "(they are assembled automatically). Start directly with the first `## ... (⏱️ HH:MM:SS)` heading."
+            )
+            en_lines.append("")
+
+        if frame_catalog:
+            en_lines.append("## Attached PNG screenshot catalog (in the same order)")
+            en_lines.append(
+                "Inspect each attached image to OCR any visible commands, code, configuration, "
+                "tables, or addresses. Embed **only** high-value visual screenshots using "
+                "**EXACTLY** the relative path listed here in standard Markdown (`![Description](path)`). "
+                "**Never** invent paths or use wikilinks `![[...]]`:"
+            )
+            for idx, (ts_hms, rel_md_path) in enumerate(frame_catalog, start=1):
+                en_lines.append(f"{idx}. `⏱️ {ts_hms}` -> `{rel_md_path}`")
+            en_lines.append("")
+        else:
+            en_lines.append("## Attached screenshots")
+            en_lines.append("There are no screenshots attached for this block; do not include image links.")
+            en_lines.append("")
+
+        en_lines.append("## Chronological block transcript")
+        en_lines.append(
+            "Turn ALL of the following technical content into exhaustive `##` sections and `###` subsections "
+            "in English, with accurate fenced code blocks, thorough explanations, Obsidian callouts, and `⏱️ HH:MM:SS` timestamps:"
+        )
+        en_lines.append("")
+        en_lines.append(
+            transcript_text.strip() or "(No spoken dialogue in this segment; analyze only the attached screenshots.)"
+        )
+        en_lines.append("")
+        en_lines.append(
+            "Remember: DO NOT summarize or omit steps, flags, commands, errors, or technical nuances. "
+            "DO NOT add chapter closing conclusions yet (they are generated after all blocks finish)."
+        )
+        return "\n".join(en_lines)
+
     lines: list[str] = [
         f"Estás redactando el **bloque cronológico {block_index} de {total_blocks}** del capítulo técnico **«{lesson_title}»**.",
         f"Ventana temporal de este bloque: **`{start_hms}` – `{end_hms}`**.",
@@ -116,8 +219,45 @@ def build_wrapup_user_prompt(
     source_video_name: str,
     all_headings: list[str],
     combined_excerpt: str,
+    target_language: str = "es",
 ) -> str:
     """Construye el prompt para generar objetivos de aprendizaje, práctica guiada y preguntas de repaso."""
+    if target_language.strip().lower().startswith("en"):
+        headings_block = (
+            "\n".join(f"- {h}" for h in all_headings)
+            if all_headings
+            else "- (No headings detected; rely on the chapter excerpt below.)"
+        )
+        return f"""You have completed writing all technical blocks for the chapter **"{lesson_title}"** (source video: `{source_video_name}`).
+
+Now generate **two editorial pieces** in clear professional technical English using EXACTLY the HTML markers below for automatic assembly:
+
+1. **Chapter opening** (between `<!-- OPENING_START -->` and `<!-- OPENING_END -->`):
+   - A short technical context paragraph (3-5 lines) explaining what problem this lesson solves and where it fits in a real IT workflow.
+   - A `## Learning Objectives` section with 4 to 7 concrete, measurable technical objectives (what the reader will be able to run, diagnose, or build).
+
+2. **Hands-on closing and review** (between `<!-- CLOSING_START -->` and `<!-- CLOSING_END -->`):
+   - A `## Hands-On Practice` section: a reproducible step-by-step lab strictly grounded in the real tools, commands, code, and concepts from this lesson. Include concrete prerequisites, verifiable commands/steps, expected output, and an interactive `- [ ]` checklist.
+   - A `## Review Questions` section: 4 to 6 deep technical questions (testing real understanding, troubleshooting, flags, or architecture, not trivia). Every question MUST use a collapsible Obsidian callout with `-` exactly like this:
+
+```markdown
+> [!question]- Concrete technical question here?
+> Detailed technical answer in English. Include commands, paths, or step-by-step reasoning.
+```
+
+## Strict rules
+- Use **standard Markdown only** (no wikilinks `[[...]]` or `![[...]]`).
+- Do not include YAML frontmatter or an H1 `#` title.
+- Do not invent tools or commands that do not appear in the chapter.
+- Emit `<!-- OPENING_START -->`, `<!-- OPENING_END -->`, `<!-- CLOSING_START -->`, and `<!-- CLOSING_END -->` exactly as shown.
+
+## Section index from the written chapter
+{headings_block}
+
+## Reference excerpt from the written chapter
+{combined_excerpt.strip()}
+"""
+
     headings_block = (
         "\n".join(f"- {h}" for h in all_headings)
         if all_headings

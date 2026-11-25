@@ -21,9 +21,9 @@ from course2book.frames import slugify_name
 from course2book.media import format_timestamp_hms
 from course2book.obsidian import build_lesson_artifacts, cleanup_lesson_artifacts
 from course2book.prompts import (
-    SYSTEM_PROMPT_EXHAUSTIVE_ES,
     build_block_user_prompt,
     build_wrapup_user_prompt,
+    get_system_prompt,
 )
 from course2book.transcriber import parse_srt
 
@@ -616,6 +616,7 @@ def synthesize_lesson(
 
     owns_synth = synthesizer is None
     synth = synthesizer or create_synthesizer(config)
+    system_prompt = get_system_prompt(config.target_language)
 
     block_markdowns: list[str] = []
     previous_headings: list[str] = []
@@ -640,10 +641,11 @@ def synthesize_lesson(
                     transcript_text=transcript_text,
                     frame_catalog=frame_catalog,
                     previous_headings=previous_headings,
+                    target_language=config.target_language,
                 )
                 image_paths = [frame.path for frame in block.frames] if config.vision else None
                 block_md = synth.generate(
-                    SYSTEM_PROMPT_EXHAUSTIVE_ES,
+                    system_prompt,
                     user_prompt,
                     images=image_paths,
                 )
@@ -667,8 +669,9 @@ def synthesize_lesson(
             source_video_name=artifacts.video_path.name,
             all_headings=previous_headings,
             combined_excerpt=_build_combined_excerpt(block_markdowns),
+            target_language=config.target_language,
         )
-        wrapup_raw = synth.generate(SYSTEM_PROMPT_EXHAUSTIVE_ES, wrapup_prompt, images=None)
+        wrapup_raw = synth.generate(system_prompt, wrapup_prompt, images=None)
         opening_md, closing_md = parse_wrapup_response(wrapup_raw)
     finally:
         if owns_synth:
@@ -683,6 +686,10 @@ def synthesize_lesson(
         duration_seconds = max(f.timestamp for f in frames)
     duration_hms = format_timestamp_hms(duration_seconds)
 
+    is_en = config.target_language.strip().lower().startswith("en")
+    tag_course = "course" if is_en else "curso"
+    tag_it = "it" if is_en else "ti"
+
     frontmatter = "\n".join(
         [
             "---",
@@ -694,20 +701,30 @@ def synthesize_lesson(
             f"model: {_yaml_quote(config.model)}",
             "status: ready",
             "tags:",
-            "  - curso",
-            "  - ti",
+            f"  - {tag_course}",
+            f"  - {tag_it}",
             "---",
         ]
+    )
+
+    meta_callout = (
+        (
+            "> [!info] Lesson metadata\n"
+            f"> - **Source video:** `{artifacts.video_path.name}`\n"
+            f"> - **Duration:** `{duration_hms}`"
+        )
+        if is_en
+        else (
+            "> [!info] Metadatos de la lección\n"
+            f"> - **Video fuente:** `{artifacts.video_path.name}`\n"
+            f"> - **Duración:** `{duration_hms}`"
+        )
     )
 
     sections: list[str] = [
         frontmatter,
         f"# {lesson_title}",
-        (
-            "> [!info] Metadatos de la lección\n"
-            f"> - **Video fuente:** `{artifacts.video_path.name}`\n"
-            f"> - **Duración:** `{duration_hms}`"
-        ),
+        meta_callout,
     ]
     if opening_md:
         sections.append(opening_md)

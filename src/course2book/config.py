@@ -105,6 +105,7 @@ RESOURCE_EXTENSIONS: frozenset[str] = frozenset(
 
 DomainProfile = Literal["it", "reveng", "cybersec", "dev", "infra", "none"]
 EngineType = Literal["agent", "ollama", "gemini", "openai-compat"]
+BookLanguage = Literal["es", "en"]
 
 DOMAIN_PROMPTS: dict[str, str] = {
     "it": (
@@ -205,7 +206,7 @@ class SynthesisConfig:
     timeout_seconds: float = 600.0
     auto_cleanup: bool = True
     resume: bool = False
-    target_language: str = "es"
+    target_language: BookLanguage = "es"
 
 
 @dataclass(slots=True)
